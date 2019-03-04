@@ -64,8 +64,9 @@ Flux<String> words = quote.flatMap(quote -> Flux.fromArray(quote.split(" ")));
 
 //by this point, none of the 3 "pipelines" have triggered an HTTP request
 ```
+Compare that with a `CompletableFuture`, which is not lazy in nature: once you have a reference to the `CompletableFuture`, it means the processing is already ongoing...
 
-But we're actually more interested in the alternative: how to trigger the pipeline.
+With that in mind, let's look into how to trigger the reactive pipeline.
 
 ## Subscription Time
 
