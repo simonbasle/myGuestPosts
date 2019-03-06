@@ -6,7 +6,7 @@ It is derived from my `Flight of the Flux` talk, which content I found to be mor
 
 I'll update the table below with links when the other posts are published, but here is the planned content:
 
-1. [Assembly vs Subscription](https://spring.io/blog/3570-flight-of-the-flux-1-assembly-vs-subscription)
+1. [Assembly vs Subscription](https://spring.io/blog/2019/03/06/flight-of-the-flux-1-assembly-vs-subscription)
 2. Debugging caveats (this post)
 3. Concurrent Agnostic
 4. Schedulers and `publishOn` vs `subscribeOn`
