@@ -33,34 +33,34 @@ Calling methods on a `Flux` or `Mono` (the _operators_) doesn't immediately trig
 
 This **declarative** phase is called **assembly time**.
 
-Let's take an example:
+Let's take an example where a client side application makes an HTTP request to a server, expecting an HttpResponse:
 
 ```java
-Flux<HttpResponse> httpSource = makeHttpRequest();
-Flux<Json> jsonSource = httpSource.map(req -> parseJson(req));
-Flux<String> quote = jsonSource.map(json -> json.getString("quote"));
+Mono<HttpResponse> httpSource = makeHttpRequest();
+Mono<Json> jsonSource = httpSource.map(req -> parseJson(req));
+Mono<String> quote = jsonSource.map(json -> json.getString("quote"));
 //at this point, no HTTP request has been made
 ```
 
 This can be simplified using the fluent API:
 
 ```java
-Flux<String> quote = makeHttpRequest()
+Mono<String> quote = makeHttpRequest()
     .map(req -> parseJson(req))
     .map(json -> json.getString("quote"));
 ```
 
 Once you are done declaring your pipeline, there are two situations: either you pass the `Flux`/`Mono` representing the processing pipeline down to another piece of code or you trigger the pipeline.
 
-The former means that the code to which you return the `Flux` might apply other operators, resulting in a derived new pipeline. Since the operators create new instances (it's like an onion), your own `Flux` is not mutated, so it could be further decorated several times with widely different results:
+The former means that the code to which you return the `Mono` might apply other operators, resulting in a derived new pipeline. Since the operators create new instances (it's like an onion), your own `Mono` is not mutated, so it could be further decorated several times with widely different results:
 
 ```java
-//you could derive a `Flux<String>` of odd-length strings vs even-length ones
-Flux<String> evenLength = quote.filter(str -> str.length() % 2 == 0);
-Flux<String> oddLength = quote.filter(str -> str.length() % 2 == 1);
+//you could derive a `Mono<String>` of odd-length strings vs even-length ones
+Mono<String> evenLength = quote.filter(str -> str.length() % 2 == 0);
+Mono<String> oddLength = quote.filter(str -> str.length() % 2 == 1);
 
 //or even a `Flux<String>` of words in a quote
-Flux<String> words = quote.flatMap(quote -> Flux.fromArray(quote.split(" ")));
+Flux<String> words = quote.flatMapMany(quote -> Flux.fromArray(quote.split(" ")));
 
 //by this point, none of the 3 "pipelines" have triggered an HTTP request
 ```
@@ -70,7 +70,7 @@ With that in mind, let's look into how to trigger the reactive pipeline.
 
 ## Subscription Time
 
-So far, we've _assembled an asynchronous pipeline_. That is, we've instantiated `Flux` and `Mono` variables through the use of _operators_, that results in `Flux` with behavior layered like an onion.
+So far, we've _assembled an asynchronous pipeline_. That is, we've instantiated `Flux` and `Mono` variables through the use of _operators_, that results other `Flux`/`Mono` with behavior layered like an onion.
 
 But the data hasn't started flowing through each of these declared pipelines yet.
 
@@ -86,12 +86,12 @@ That signalling of interest is propagated backwards through the chain of operato
 makeHttpRequest() //<5>
     .map(req -> parseJson(req)) //<4>
     .map(json -> json.getString("quote")) //<3>
-    .flatMap(quote -> Flux.fromArray(quote.split(" "))) //<2>
+    .flatMapMany(quote -> Flux.fromArray(quote.split(" "))) //<2>
     .subscribe(System.out::println, Throwable::printStackTrace); //<1>
 ```
 
 1. we subscribe to the words `Flux`, stating that we want to print each word to the console (and print the stack trace of any error)
-2. that interest is signalled to the `flatMap` step...
+2. that interest is signalled to the `flatMapMany` step...
 3. ...which signals it up the chain to the json `map` step...
 4. ...then the request `map` step...
 5. ...to finally reach the `makeHttpRequest()` (which we'll consider our source)
@@ -102,8 +102,8 @@ From there on, we're in _execution time_. The data has started flowing through t
 
 1. The `HttpResponse` is emitted to the `parseJson` `map`
 2. It extracts the JSON body and emits it to the `getString` `map` 
-3. Which extracts the _quote_ and passes it to the `flatMap`
-4. The `flatMap` splits the quote into words and emit each word individually
+3. Which extracts the _quote_ and passes it to the `flatMapMany`
+4. The `flatMapMany` splits the quote into words and emit each word individually
 5. The value handler in the `subscribe` is notified of each word, printing these to the console, one per line
 
 Hopefully that helps you understand the difference between assembly time and subscription/execution time!
@@ -118,12 +118,12 @@ Right after explaining the difference and introducing this mantra is probably a 
 
 So far, we've been dealing with a flavor of `Flux` and `Mono` sources called a **Cold `Publisher`**. As we've explained, these `Publishers` are lazy and only generate data when there is a `Subscription`. Furthermore, they generate the data anew for each individual `Subscription`.
 
-In our example of an HTTP response `Flux`, the HTTP request would be performed for each subscription:  
+In our example of an HTTP response `Mono`, the HTTP request would be performed for each subscription:  
 
 ```java
-Flux<String> evenLength = quote.filter(str -> str.length() % 2 == 0);
-Flux<String> oddLength = quote.filter(str -> str.length() % 2 == 1);
-Flux<String> words = quote.flatMap(quote -> Flux.fromArray(quote.split(" ")));
+Mono<String> evenLength = quote.filter(str -> str.length() % 2 == 0);
+Mono<String> oddLength = quote.filter(str -> str.length() % 2 == 1);
+Flux<String> words = quote.flatMapMany(quote -> Flux.fromArray(quote.split(" ")));
 
 evenLength.subscribe(); //this triggers an HTTP request
 oddLength.subscribe(); //this triggers another HTTP request
