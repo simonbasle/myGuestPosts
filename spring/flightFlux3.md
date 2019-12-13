@@ -2,9 +2,11 @@
 
 This blog post is the third in a series of posts that aim at providing a deeper look into [Reactor](https://github.com/reactor/reactor-core)’s more advanced concepts and inner workings.
 
-It is derived from my `Flight of the Flux` talk, which content I found to be more adapted to a blog post format.
+In this post, we explore the threading model, how some (most) operators are concurrent agnostic, the `Scheduler` abstraction and how to hop from one thread to another mid-sequence with operators like `publishOn`.
 
-I’ll update the table below with links when the other posts are published, but here is the planned content:
+This series is derived from the `Flight of the Flux` talk, which content I found to be more adapted to a blog post format.
+
+The table below will be updated with links when the other posts are published, but here is the planned content:
 
 1. [Assembly vs Subscription](https://spring.io/blog/2019/03/06/flight-of-the-flux-1-assembly-vs-subscription)
 2. [Debugging caveats](https://spring.io/blog/2019/04/16/flight-of-the-flux-2-debugging-caveats)
@@ -78,7 +80,7 @@ This is very useful in test scenarios where you have a `Flux` or `Mono` with lon
 
 One could also imagine implementing a `Scheduler` around a Actor system, the `ForkJoinPool`, upcoming Loom fibers, etc...
 
-> :warning: **About the _main_ `Thread`**
+> **About the _main_ `Thread`**
 >
 > Often, people ask about switching back and forth between a `Scheduler`'s thread and the _main_ thread. Going from the main to a scheduler is obviously possible, **but going from an arbitrary thread to the _main_ thread is not possible**. That is plainly a Java limitation, as there is no way to submit tasks to the _main_ thread (e.g. there's no MainThreadExecutorService).
 
@@ -90,7 +92,7 @@ We've already established that most operator continue their work on the `Thread`
 
 The philosophy of Reactor is to give you tools to do the right thing, by way of composing operators. Threading is not an exception: meet `subscribeOn` and `publishOn`.
 
-These two operators simply take a `Scheduler` and will switch execution on one of that scheduler's `Worker`. There is of course a major difference between the two :smile:
+These two operators simply take a `Scheduler` and will switch execution on one of that scheduler's `Worker`. There is of course a major difference between the two :)
 
 ### The `publishOn(Scheduler s)` operator
 
@@ -100,7 +102,7 @@ This is valid for the `onNext`, `onComplete` and `onError` signals. That is, sig
 
 So in essence, every processing step that appears below this operator will execute on the new `Scheduler` `s`, until another operator switches again (eg. another `publishOn`).
 
-Let's take a deliberately sketchy example with blocking calls (but remember! blocking calls in a reactive chain are always sketchy :sweat_smile:).
+Let's take a deliberately sketchy example with blocking calls But remember, blocking calls in a reactive chain are always sketchy! :)
 
 ```java
 Flux.fromIterable(firstListOfUrls) //contains A, B and C
@@ -148,7 +150,7 @@ boundedElastic-2 from second list, got E
 boundedElastic-1 from first list, got C
 ```
 
-first list and second list are interleaved now :+1:
+First list and second list are interleaved now, great !
 
 ### The `subscribeOn(Scheduler s)` operator
 
@@ -201,7 +203,7 @@ This continues down the data path, each subscriber executing `onNext` on its sou
 
 At last, the lambdas configured in the `subscribe(...)` call are also executed on the `boundedElastic` thread.
 
-> :warning: **Important**
+> **Important**
 >
 > It is important to distinguish the _act_ of subscribing and the lambda passed to the `subscribe()` method. This method subscribes to its source `Flux`, but the lambda are executed at the end of processing, when the data has flown through all the steps (including steps that hop to another thread),.
 >
@@ -257,7 +259,7 @@ We should unpack what happened step by step:
 - the second `doOnNext` receives its data on `boundedElastic` and prints `publish bounderElastic-1` accordingly.
 - `delayElements` is a time operator, so by default it publishes data on the `Schedulers.parallel()` scheduler.
 - on the data path, `subscribeOn` does nothing but propagating signal on the same thread.
-- on the data path, the lambda(s) passed to `subscribe(...)` are executed on the thread in which data signals are received, so the lambda prints `hello delayed parallel-1` :+1:
+- on the data path, the lambda(s) passed to `subscribe(...)` are executed on the thread in which data signals are received, so the lambda prints `hello delayed parallel-1`
 
 ## Conclusion
 
